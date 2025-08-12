@@ -10,6 +10,15 @@ The system consists of three main user interfaces: a public event browsing and t
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+- Updated contract address configuration to use environment variables properly
+- Fixed homepage to display events without requiring wallet connection initially
+- Added admin access control - only contract owner can access admin dashboard
+- Removed dummy data and improved real blockchain data integration
+- Fixed wallet connection flow - users only connect when purchasing tickets
+- Improved error handling for contract interactions
+
 ## System Architecture
 
 ### Frontend Architecture

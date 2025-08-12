@@ -21,9 +21,11 @@ export default function AdminDashboard() {
     totalRevenue: 0,
     activeEvents: 0,
   });
+  const [isOwner, setIsOwner] = useState(false);
+  const [isCheckingOwner, setIsCheckingOwner] = useState(true);
 
   const { createEvent, getEventDetails, getEventCounter, isLoading } = useContract();
-  const { isConnected } = useWallet();
+  const { isConnected, address } = useWallet();
 
   const form = useForm<CreateEventInput>({
     resolver: zodResolver(createEventSchema),
@@ -42,10 +44,46 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    if (isConnected) {
+    if (isConnected && address) {
+      checkIfOwner();
+    } else {
+      setIsCheckingOwner(false);
+    }
+  }, [isConnected, address]);
+
+  useEffect(() => {
+    if (isConnected && isOwner) {
       loadDashboardData();
     }
-  }, [isConnected]);
+  }, [isConnected, isOwner]);
+
+  const checkIfOwner = async () => {
+    try {
+      setIsCheckingOwner(true);
+      // Create a provider to check contract owner
+      if (window.ethereum && address) {
+        const ethers = await import("ethers");
+        const { CONTRACT_ABI, CONTRACT_ADDRESS } = await import("@/lib/contractABI");
+        
+        if (!CONTRACT_ADDRESS) {
+          setIsOwner(false);
+          setIsCheckingOwner(false);
+          return;
+        }
+
+        const provider = new ethers.ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+        const contractOwner = await contract.owner();
+        
+        setIsOwner(address.toLowerCase() === contractOwner.toLowerCase());
+      }
+    } catch (error) {
+      console.error("Failed to check owner:", error);
+      setIsOwner(false);
+    } finally {
+      setIsCheckingOwner(false);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -108,6 +146,33 @@ export default function AdminDashboard() {
           <CardContent className="pt-6 text-center">
             <h2 className="text-2xl font-bold mb-4">Admin Dashboard</h2>
             <p className="text-gray-600 mb-6">Connect your wallet to access the admin dashboard</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isCheckingOwner) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <h2 className="text-2xl font-bold mb-4">Checking Access...</h2>
+            <p className="text-gray-600">Verifying your admin permissions</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!isOwner) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+            <p className="text-gray-600 mb-4">Only the contract owner can access the admin dashboard</p>
+            <p className="text-sm text-gray-500">Connected as: {address?.slice(0, 6)}...{address?.slice(-4)}</p>
           </CardContent>
         </Card>
       </div>

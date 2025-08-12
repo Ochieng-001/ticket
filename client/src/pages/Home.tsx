@@ -7,6 +7,8 @@ import { useContract } from "@/hooks/useContract";
 import { useWallet } from "@/hooks/useWallet";
 import { type Event } from "@shared/schema";
 import { Search, HelpCircle } from "lucide-react";
+import { ethers } from "ethers";
+import { CONTRACT_ABI, CONTRACT_ADDRESS } from "@/lib/contractABI";
 
 export default function Home() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -20,37 +22,77 @@ export default function Home() {
 
   useEffect(() => {
     loadEvents();
-  }, [isConnected]);
+  }, []);
 
   const loadEvents = async () => {
-    if (!isConnected) {
+    // Show empty state if no contract address is configured
+    if (!CONTRACT_ADDRESS) {
+      setEvents([]);
       setIsLoading(false);
       return;
     }
 
     try {
       setIsLoading(true);
-      const eventCount = await getEventCounter();
-      const eventPromises = [];
-      
-      for (let i = 1; i <= eventCount; i++) {
-        eventPromises.push(getEventDetails(i));
+      // Create a read-only provider to get events without wallet connection
+      if (window.ethereum) {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+        
+        const eventCount = await contract.eventCounter();
+        const eventPromises = [];
+        
+        for (let i = 1; i <= Number(eventCount); i++) {
+          eventPromises.push(getEventDetailsReadOnly(contract, i));
+        }
+        
+        const eventResults = await Promise.all(eventPromises);
+        const activeEvents = eventResults.filter(event => event.isActive);
+        setEvents(activeEvents);
       }
-      
-      const eventResults = await Promise.all(eventPromises);
-      const activeEvents = eventResults
-        .filter(result => result.event.isActive)
-        .map(result => result.event);
-      
-      setEvents(activeEvents);
     } catch (error) {
       console.error("Failed to load events:", error);
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const getEventDetailsReadOnly = async (contract: ethers.Contract, eventId: number) => {
+    const eventDetails = await contract.getEventDetails(eventId);
+    const eventSupply = await contract.getEventSupply(eventId);
+    
+    // Convert ETH prices to KES using exchange rate
+    const response = await fetch('/api/exchange-rate');
+    const exchangeData = await response.json();
+    const kessPrices = eventDetails.prices.map((priceWei: bigint) => {
+      const ethAmount = parseFloat(ethers.formatEther(priceWei));
+      return ethAmount * exchangeData.ethToKes;
+    });
+    
+    return {
+      eventId,
+      name: eventDetails.name,
+      description: "",
+      venue: eventDetails.venue,
+      eventDate: Number(eventDetails.eventDate),
+      prices: kessPrices,
+      supply: eventSupply.supply.map((s: bigint) => Number(s)),
+      sold: eventSupply.sold.map((s: bigint) => Number(s)),
+      isActive: eventDetails.isActive,
+      creator: "",
+    };
+  };
+
   const handleEventClick = async (event: Event) => {
+    if (!isConnected) {
+      // Show a message to connect wallet first
+      setSelectedEvent(event);
+      setAvailableTickets(event.supply.map((supply, index) => supply - event.sold[index]));
+      setIsEventModalOpen(true);
+      return;
+    }
+
     try {
       const result = await getEventDetails(event.eventId);
       setSelectedEvent(result.event);
@@ -67,43 +109,7 @@ export default function Home() {
     }, 0);
   };
 
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-r from-primary to-blue-600 text-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="text-center">
-              <h1 className="text-4xl md:text-6xl font-bold mb-6">Decentralized Event Ticketing</h1>
-              <p className="text-xl md:text-2xl opacity-90 mb-8 max-w-3xl mx-auto">
-                Secure, transparent, and blockchain-powered ticket purchases with MetaMask integration
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button className="bg-white text-primary px-8 py-3 hover:bg-gray-100">
-                  <Search className="w-5 h-5 mr-2" />
-                  Browse Events
-                </Button>
-                <Button variant="outline" className="border-2 border-white text-white px-8 py-3 hover:bg-white hover:text-primary">
-                  <HelpCircle className="w-5 h-5 mr-2" />
-                  How it Works
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Connect Wallet CTA */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Connect Your Wallet</h2>
-            <p className="text-xl text-gray-600 mb-8">
-              Connect your MetaMask wallet to browse and purchase event tickets on the blockchain
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">

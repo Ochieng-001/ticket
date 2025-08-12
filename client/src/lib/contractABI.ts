@@ -460,4 +460,4 @@ export const CONTRACT_ABI = [
 ] as const;
 
 // Contract address would be set after deployment
-export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "0x742d35Cc6634C0532925a3b8D89d3f7ebE3a2542";
+export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || "";

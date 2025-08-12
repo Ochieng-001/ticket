@@ -79,6 +79,10 @@ export function EventModal({ isOpen, onClose, event, availableTickets }: EventMo
     setTransactionStatus('loading');
 
     try {
+      // Get current exchange rate for accurate conversion
+      const response = await fetch('/api/exchange-rate');
+      const exchangeData = await response.json();
+      
       // For simplicity, we'll purchase each ticket type separately
       // In production, you might want to batch these or handle multiple purchases
       for (const [typeStr, quantity] of Object.entries(quantities)) {
@@ -86,8 +90,8 @@ export function EventModal({ isOpen, onClose, event, availableTickets }: EventMo
           const ticketType = parseInt(typeStr) as TicketType;
           const priceKES = event.prices[ticketType];
           
-          // Convert KES to ETH (simplified - in production you'd get real exchange rate)
-          const priceETH = (priceKES * 0.0000075).toString(); // Approximate conversion
+          // Convert KES to ETH using real exchange rate
+          const priceETH = (priceKES * exchangeData.kesToEth).toString();
           
           for (let i = 0; i < quantity; i++) {
             await purchaseTicket(event.eventId, ticketType, `${ticketType}-${i + 1}`, priceETH);

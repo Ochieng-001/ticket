@@ -17,6 +17,10 @@ export class Web3Service {
       throw new Error("MetaMask is not installed. Please install MetaMask to continue.");
     }
 
+    if (!CONTRACT_ADDRESS) {
+      throw new Error("Contract address not configured. Please set VITE_CONTRACT_ADDRESS environment variable.");
+    }
+
     try {
       this.provider = new ethers.BrowserProvider(window.ethereum);
       
@@ -39,7 +43,7 @@ export class Web3Service {
   }
 
   async checkConnection(): Promise<string | null> {
-    if (!window.ethereum) return null;
+    if (!window.ethereum || !CONTRACT_ADDRESS) return null;
 
     try {
       this.provider = new ethers.BrowserProvider(window.ethereum);
