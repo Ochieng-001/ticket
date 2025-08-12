@@ -10,8 +10,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { createEventSchema, type CreateEventInput, type Event } from "@shared/schema";
 import { useContract } from "@/hooks/useContract";
 import { useWallet } from "@/hooks/useWallet";
-import { Calendar, Ticket, Coins, Users, Plus } from "lucide-react";
+import { Calendar, Ticket, Coins, Users, Plus, Edit, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -23,11 +26,31 @@ export default function AdminDashboard() {
   });
   const [isOwner, setIsOwner] = useState(false);
   const [isCheckingOwner, setIsCheckingOwner] = useState(true);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   const { createEvent, getEventDetails, getEventCounter, isLoading } = useContract();
   const { isConnected, address } = useWallet();
+  const { toast } = useToast();
 
   const form = useForm<CreateEventInput>({
+    resolver: zodResolver(createEventSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      venue: "",
+      eventDate: "",
+      regularPrice: 1000,
+      vipPrice: 2500,
+      vvipPrice: 5000,
+      regularSupply: 100,
+      vipSupply: 50,
+      vvipSupply: 20,
+    },
+  });
+
+  const editForm = useForm<CreateEventInput>({
     resolver: zodResolver(createEventSchema),
     defaultValues: {
       name: "",
@@ -134,8 +157,79 @@ export default function AdminDashboard() {
       
       form.reset();
       loadDashboardData();
+      setShowCreateDialog(false);
+      toast({
+        title: "Event Created",
+        description: "Your event has been successfully created on the blockchain.",
+      });
     } catch (error) {
       console.error("Failed to create event:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create event. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditEvent = (event: Event) => {
+    setEditingEvent(event);
+    editForm.reset({
+      name: event.name,
+      description: event.description || "",
+      venue: event.venue,
+      eventDate: new Date(event.eventDate * 1000).toISOString().split('T')[0],
+      regularPrice: event.prices[0],
+      vipPrice: event.prices[1],
+      vvipPrice: event.prices[2],
+      regularSupply: event.supply[0],
+      vipSupply: event.supply[1],
+      vvipSupply: event.supply[2],
+    });
+    setShowEditDialog(true);
+  };
+
+  const handleUpdateEvent = async (data: CreateEventInput) => {
+    if (!editingEvent) return;
+    
+    try {
+      // Note: In a real implementation, you'd need to add an updateEvent function to your contract
+      // For now, we'll show a message that this would be implemented
+      toast({
+        title: "Update Event",
+        description: "Event update functionality would be implemented in the smart contract.",
+        variant: "default",
+      });
+      setShowEditDialog(false);
+      setEditingEvent(null);
+    } catch (error) {
+      console.error("Failed to update event:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update event. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      // Note: In a real implementation, you'd need to add a deleteEvent function to your contract
+      // For now, we'll show a message that this would be implemented
+      toast({
+        title: "Delete Event",
+        description: "Event deletion functionality would be implemented in the smart contract.",
+        variant: "default",
+      });
+      // Would refresh events after deletion
+      // loadDashboardData();
+    } catch (error) {
+      console.error("Failed to delete event:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete event. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -465,6 +559,39 @@ export default function AdminDashboard() {
                       <Badge className={event.isActive ? "bg-secondary/10 text-secondary" : "bg-gray-100 text-gray-600"}>
                         {event.isActive ? "Active" : "Inactive"}
                       </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditEvent(event)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete "{event.name}"? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDeleteEvent(event.eventId)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </div>
@@ -479,6 +606,203 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Event Dialog */}
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Event</DialogTitle>
+              <DialogDescription>
+                Update your event details. Note: Some restrictions may apply based on tickets already sold.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(handleUpdateEvent)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={editForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Event Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter event name" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={editForm.control}
+                    name="venue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Venue</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Event venue" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={editForm.control}
+                    name="eventDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Event Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="md:col-span-2">
+                    <FormField
+                      control={editForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea placeholder="Event description" rows={3} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* Ticket Configuration */}
+                  <div className="md:col-span-2">
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Ticket Configuration</h4>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Note: Price and supply changes may be restricted if tickets have already been sold.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Regular Tickets */}
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h5 className="font-medium text-gray-900 mb-3">Regular Tickets</h5>
+                        <div className="space-y-3">
+                          <FormField
+                            control={editForm.control}
+                            name="regularPrice"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Price (KES)</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={editForm.control}
+                            name="regularSupply"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Supply</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      {/* VIP Tickets */}
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h5 className="font-medium text-gray-900 mb-3">VIP Tickets</h5>
+                        <div className="space-y-3">
+                          <FormField
+                            control={editForm.control}
+                            name="vipPrice"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Price (KES)</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={editForm.control}
+                            name="vipSupply"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Supply</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+
+                      {/* VVIP Tickets */}
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <h5 className="font-medium text-gray-900 mb-3">VVIP Tickets</h5>
+                        <div className="space-y-3">
+                          <FormField
+                            control={editForm.control}
+                            name="vvipPrice"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Price (KES)</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={editForm.control}
+                            name="vvipSupply"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Supply</FormLabel>
+                                <FormControl>
+                                  <Input type="number" {...field} onChange={(e) => field.onChange(Number(e.target.value))} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-4">
+                  <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={isLoading}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    {isLoading ? "Updating..." : "Update Event"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
