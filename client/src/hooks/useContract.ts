@@ -68,15 +68,29 @@ export function useContract() {
   ) => {
     setIsLoading(true);
     try {
+      console.log(`Purchasing ticket: eventId=${eventId}, type=${ticketType}, seat=${seat}, price=${priceInEth} ETH`);
+      
       const contract = web3Service.getContract();
       const priceWei = web3Service.parseEther(priceInEth);
       
-      const tx = await contract.purchaseTicket(eventId, ticketType, seat, {
+      console.log(`Price in Wei: ${priceWei.toString()}`);
+      
+      // Estimate gas first
+      const gasEstimate = await contract.purchaseTicket.estimateGas(eventId, ticketType, seat, {
         value: priceWei,
-        gasLimit: 300000, // Set gas limit to prevent out of gas errors
       });
       
-      await tx.wait();
+      console.log(`Gas estimate: ${gasEstimate.toString()}`);
+      
+      const tx = await contract.purchaseTicket(eventId, ticketType, seat, {
+        value: priceWei,
+        gasLimit: gasEstimate * BigInt(120) / BigInt(100), // Add 20% buffer to gas estimate
+      });
+      
+      console.log("Transaction sent:", tx.hash);
+      
+      const receipt = await tx.wait();
+      console.log("Transaction confirmed:", receipt);
       
       toast({
         title: "Ticket Purchased",
@@ -85,9 +99,20 @@ export function useContract() {
       
       return tx;
     } catch (error: any) {
+      console.error("Purchase error details:", error);
+      
+      let errorMessage = "Failed to purchase ticket";
+      if (error.code === 4001) {
+        errorMessage = "Transaction was rejected by user";
+      } else if (error.code === -32603) {
+        errorMessage = "Transaction failed - check contract address and network";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Purchase Failed",
-        description: error.message || "Failed to purchase ticket",
+        description: errorMessage,
         variant: "destructive",
       });
       throw error;

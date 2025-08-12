@@ -66,6 +66,9 @@ export class Web3Service {
     if (!this.contract) {
       throw new Error("Contract not initialized. Please connect wallet first.");
     }
+    if (!CONTRACT_ADDRESS) {
+      throw new Error("Contract address not configured. Please set VITE_CONTRACT_ADDRESS environment variable.");
+    }
     return this.contract;
   }
 

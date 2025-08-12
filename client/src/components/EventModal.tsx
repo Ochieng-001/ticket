@@ -72,6 +72,7 @@ export function EventModal({ isOpen, onClose, event, availableTickets }: EventMo
 
   const handlePurchase = async () => {
     if (!isConnected) {
+      console.error("Wallet not connected");
       return;
     }
 
@@ -91,10 +92,14 @@ export function EventModal({ isOpen, onClose, event, availableTickets }: EventMo
           const priceKES = event.prices[ticketType];
           
           // Convert KES to ETH using real exchange rate
-          const priceETH = (priceKES * exchangeData.kesToEth).toString();
+          // Make sure we have a reasonable conversion rate
+          const kesToEthRate = exchangeData.kesToEth || 0.0000075; // fallback rate
+          const priceETH = (priceKES * kesToEthRate).toFixed(8); // 8 decimal places for precision
+          
+          console.log(`Purchasing ${quantity} tickets of type ${ticketType} for ${priceETH} ETH each (${priceKES} KES)`);
           
           for (let i = 0; i < quantity; i++) {
-            await purchaseTicket(event.eventId, ticketType, `${ticketType}-${i + 1}`, priceETH);
+            await purchaseTicket(event.eventId, ticketType, `${event.name}-${ticketType}-${Date.now()}-${i}`, priceETH);
           }
         }
       }
@@ -104,7 +109,8 @@ export function EventModal({ isOpen, onClose, event, availableTickets }: EventMo
         setShowTransactionModal(false);
         onClose();
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Purchase failed:", error);
       setTransactionStatus('error');
     }
   };
@@ -215,7 +221,7 @@ export function EventModal({ isOpen, onClose, event, availableTickets }: EventMo
                     >
                       {!isConnected ? "Connect Wallet First" : 
                        isLoading ? "Processing..." : 
-                       "Purchase with MetaMask"}
+                       `Purchase ${getTotalTickets()} Ticket${getTotalTickets() !== 1 ? 's' : ''} for KES ${getTotalCost().toLocaleString()}`}
                     </Button>
                     
                     <p className="text-xs text-gray-500 mt-3 text-center">

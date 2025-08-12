@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { ContractDebugInfo } from "@/components/ContractDebugInfo";
 
 export default function AdminDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -280,6 +281,9 @@ export default function AdminDashboard() {
           <h2 className="text-3xl font-bold text-gray-900">Admin Dashboard</h2>
           <p className="text-gray-600 mt-2">Create and manage events on the blockchain</p>
         </div>
+
+        {/* Debug Info */}
+        <ContractDebugInfo />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
