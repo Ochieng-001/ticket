@@ -18,6 +18,7 @@ import { type Event, TicketType } from "@shared/schema";
 import { useContract } from "@/hooks/useContract";
 import { useWallet } from "@/hooks/useWallet";
 import { TransactionModal } from "@/components/TransactionModal";
+import { formatPriceNumber } from "@/lib/formatPrice";
 
 interface EventModalProps {
   isOpen: boolean;
@@ -314,7 +315,9 @@ export function EventModal({
                             <div className="text-right">
                               <p className="text-2xl font-bold text-gray-900">
                                 KES{" "}
-                                {event.prices[ticketType.type].toLocaleString()}
+                                {formatPriceNumber(
+                                  event.prices[ticketType.type]
+                                )}
                               </p>
                               <p className="text-xs text-gray-500">
                                 ≈ $
@@ -390,7 +393,7 @@ export function EventModal({
                             Subtotal ({getTotalTickets()} tickets)
                           </span>
                           <span className="font-medium">
-                            KES {getTotalCost().toLocaleString()}
+                            KES {formatPriceNumber(getTotalCost())}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
@@ -409,7 +412,7 @@ export function EventModal({
                           </span>
                           <div className="text-right">
                             <div className="text-2xl font-bold text-gray-900">
-                              KES {getTotalCost().toLocaleString()}
+                              KES {formatPriceNumber(getTotalCost())}
                             </div>
                             <div className="text-sm text-gray-500">
                               ≈ ${(getTotalCost() * 0.0075).toFixed(2)} USD

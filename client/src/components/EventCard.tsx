@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, MapPin, Users, Star, Ticket } from "lucide-react";
 import { type Event } from "@shared/schema";
+import { formatPriceNumber, getMinPrice, getMaxPrice } from "@/lib/formatPrice";
 
 interface EventCardProps {
   event: Event;
@@ -15,8 +16,8 @@ export function EventCard({
   onClick,
 }: EventCardProps) {
   const eventDate = new Date(event.eventDate * 1000);
-  const minPrice = Math.min(...event.prices);
-  const maxPrice = Math.max(...event.prices);
+  const minPrice = getMinPrice(event.prices);
+  const maxPrice = getMaxPrice(event.prices);
   const totalCapacity = event.supply.reduce((sum, s) => sum + s, 0);
   const soldTickets = event.sold.reduce((sum, s) => sum + s, 0);
   const salePercentage = ((soldTickets / totalCapacity) * 100).toFixed(0);
@@ -158,11 +159,11 @@ export function EventCard({
               </p>
               <div className="flex items-baseline space-x-2">
                 <p className="text-2xl font-bold text-gray-900">
-                  KES {minPrice.toLocaleString()}
+                  KES {formatPriceNumber(minPrice)}
                 </p>
                 {maxPrice > minPrice && (
                   <p className="text-sm text-gray-500 line-through">
-                    KES {maxPrice.toLocaleString()}
+                    KES {formatPriceNumber(maxPrice)}
                   </p>
                 )}
               </div>

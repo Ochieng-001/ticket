@@ -28,6 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 import { format } from "date-fns";
+import { formatPrice } from "@/lib/formatPrice";
 
 interface TicketVerificationResult {
   isValid: boolean;
@@ -69,7 +70,7 @@ export default function TicketVerification() {
       case 2:
         return "VVIP";
       default:
-        return "Unknown";
+        return "Regular";
     }
   };
 
@@ -454,27 +455,13 @@ export default function TicketVerification() {
                   <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <MapPin className="w-4 h-4 text-pink-600" />
-                        <span className="text-gray-600 font-medium">
-                          Seat Assignment
-                        </span>
-                      </div>
-                      <span className="font-bold text-gray-900">
-                        {ticketDetails.seat}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
                         <CreditCard className="w-4 h-4 text-green-600" />
                         <span className="text-gray-600 font-medium">
                           Purchase Price
                         </span>
                       </div>
                       <span className="font-bold text-green-700">
-                        KES {ticketDetails.purchasePrice.toLocaleString()}
+                        {formatPrice(ticketDetails.purchasePrice)}
                       </span>
                     </div>
                   </div>
