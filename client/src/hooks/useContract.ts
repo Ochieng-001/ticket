@@ -141,7 +141,7 @@ export function useContract() {
       const event: Event = {
         eventId,
         name: eventDetails.name,
-        description: "", // Description stored separately
+        description: "", // Will fetch description separately
         venue: eventDetails.venue,
         eventDate: Number(eventDetails.eventDate),
         prices: kessPrices,
@@ -215,6 +215,181 @@ export function useContract() {
     }
   }, []);
 
+  // New functions for updated contract
+  const verifyTicket = useCallback(async (ticketId: number) => {
+    try {
+      const contract = web3Service.getContract();
+      const verificationResult = await contract.verifyTicket(ticketId);
+      
+      return {
+        isValid: verificationResult.isValid,
+        isUsed: verificationResult.isUsed,
+        eventName: verificationResult.eventName,
+        eventDate: Number(verificationResult.eventDate),
+      };
+    } catch (error: any) {
+      toast({
+        title: "Verification Failed",
+        description: error.message || "Could not verify ticket",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [toast]);
+
+  const useTicket = useCallback(async (ticketId: number) => {
+    setIsLoading(true);
+    try {
+      const contract = web3Service.getContract();
+      const tx = await contract.useTicket(ticketId);
+      await tx.wait();
+      
+      toast({
+        title: "Ticket Used",
+        description: "Ticket has been marked as used successfully",
+      });
+      
+      return tx;
+    } catch (error: any) {
+      toast({
+        title: "Failed to Use Ticket",
+        description: error.message || "Could not mark ticket as used",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  const updateEvent = useCallback(async (eventData: {
+    eventId: number;
+    name: string;
+    description: string;
+    venue: string;
+    eventDate: string;
+    prices: [number, number, number];
+    supply: [number, number, number];
+  }) => {
+    setIsLoading(true);
+    try {
+      const contract = web3Service.getContract();
+      
+      // Convert KES prices to Wei
+      const ethPrices = await Promise.all(
+        eventData.prices.map(async (kesPrice) => {
+          const ethAmount = await web3Service.kestoEth(kesPrice);
+          return web3Service.parseEther(ethAmount);
+        })
+      );
+      
+      // Convert date to timestamp
+      const eventTimestamp = Math.floor(new Date(eventData.eventDate).getTime() / 1000);
+      
+      const tx = await contract.updateEventDetails(
+        eventData.eventId,
+        eventData.name,
+        eventData.description,
+        eventData.venue,
+        eventTimestamp,
+        ethPrices,
+        eventData.supply
+      );
+      
+      await tx.wait();
+      
+      toast({
+        title: "Event Updated",
+        description: "Event has been successfully updated on the blockchain!",
+      });
+      
+      return tx;
+    } catch (error: any) {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update event",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  const deleteEvent = useCallback(async (eventId: number) => {
+    setIsLoading(true);
+    try {
+      const contract = web3Service.getContract();
+      const tx = await contract.deleteEvent(eventId);
+      await tx.wait();
+      
+      toast({
+        title: "Event Deleted",
+        description: "Event has been successfully deleted (marked as inactive)",
+      });
+      
+      return tx;
+    } catch (error: any) {
+      toast({
+        title: "Delete Failed",
+        description: error.message || "Failed to delete event",
+        variant: "destructive",
+      });
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  const getTicketDetails = useCallback(async (ticketId: number) => {
+    try {
+      const contract = web3Service.getContract();
+      const ticketDetails = await contract.getTicketDetails(ticketId);
+      
+      // Convert price back to KES
+      const ethAmount = web3Service.formatEther(ticketDetails.purchasePrice);
+      const kesPrice = await web3Service.ethToKes(ethAmount);
+      
+      return {
+        eventId: Number(ticketDetails.eventId),
+        ticketOwner: ticketDetails.ticketOwner,
+        ticketType: ticketDetails.ticketType,
+        purchasePrice: kesPrice,
+        isUsed: ticketDetails.isUsed,
+        seat: ticketDetails.seat,
+      };
+    } catch (error: any) {
+      toast({
+        title: "Failed to Load Ticket",
+        description: error.message || "Could not load ticket details",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  }, [toast]);
+
+  const checkIfAdmin = useCallback(async (address: string) => {
+    try {
+      const contract = web3Service.getContract();
+      const isAdmin = await contract.admins(address);
+      return isAdmin;
+    } catch (error: any) {
+      console.error("Failed to check admin status:", error);
+      return false;
+    }
+  }, []);
+
+  const getContractOwner = useCallback(async () => {
+    try {
+      const contract = web3Service.getContract();
+      const owner = await contract.owner();
+      return owner;
+    } catch (error: any) {
+      console.error("Failed to get contract owner:", error);
+      return null;
+    }
+  }, []);
+
   return {
     isLoading,
     createEvent,
@@ -222,5 +397,12 @@ export function useContract() {
     getEventDetails,
     getUserTickets,
     getEventCounter,
+    verifyTicket,
+    useTicket,
+    updateEvent,
+    deleteEvent,
+    getTicketDetails,
+    checkIfAdmin,
+    getContractOwner,
   };
 }

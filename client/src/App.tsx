@@ -9,6 +9,7 @@ import { Ticket, Shield } from "lucide-react";
 import Home from "@/pages/Home";
 import AdminDashboard from "@/pages/AdminDashboard";
 import MyTickets from "@/pages/MyTickets";
+import TicketVerification from "@/pages/TicketVerification";
 import NotFound from "@/pages/not-found";
 
 function Navigation() {
@@ -44,6 +45,14 @@ function Navigation() {
                   My Tickets
                 </Button>
               </Link>
+              <Link href="/verify">
+                <Button 
+                  variant={location === "/verify" ? "default" : "ghost"}
+                  className={location === "/verify" ? "bg-primary text-white" : ""}
+                >
+                  Verify
+                </Button>
+              </Link>
               <Link href="/admin">
                 <Button 
                   variant={location === "/admin" ? "default" : "ghost"}
@@ -72,6 +81,7 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/admin" component={AdminDashboard} />
         <Route path="/tickets" component={MyTickets} />
+        <Route path="/verify" component={TicketVerification} />
         <Route component={NotFound} />
       </Switch>
     </>

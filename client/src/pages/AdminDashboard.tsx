@@ -31,7 +31,7 @@ export default function AdminDashboard() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
 
-  const { createEvent, getEventDetails, getEventCounter, isLoading } = useContract();
+  const { createEvent, getEventDetails, getEventCounter, updateEvent, deleteEvent, isLoading } = useContract();
   const { isConnected, address } = useWallet();
   const { toast } = useToast();
 
@@ -194,43 +194,32 @@ export default function AdminDashboard() {
     if (!editingEvent) return;
     
     try {
-      // Note: In a real implementation, you'd need to add an updateEvent function to your contract
-      // For now, we'll show a message that this would be implemented
-      toast({
-        title: "Update Event",
-        description: "Event update functionality would be implemented in the smart contract.",
-        variant: "default",
+      await updateEvent({
+        eventId: editingEvent.eventId,
+        name: data.name,
+        description: data.description,
+        venue: data.venue,
+        eventDate: data.eventDate,
+        prices: [data.regularPrice, data.vipPrice, data.vvipPrice],
+        supply: [data.regularSupply, data.vipSupply, data.vvipSupply],
       });
+      
       setShowEditDialog(false);
       setEditingEvent(null);
+      // Refresh the events list
+      loadDashboardData();
     } catch (error) {
       console.error("Failed to update event:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update event. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
   const handleDeleteEvent = async (eventId: number) => {
     try {
-      // Note: In a real implementation, you'd need to add a deleteEvent function to your contract
-      // For now, we'll show a message that this would be implemented
-      toast({
-        title: "Delete Event",
-        description: "Event deletion functionality would be implemented in the smart contract.",
-        variant: "default",
-      });
-      // Would refresh events after deletion
-      // loadDashboardData();
+      await deleteEvent(eventId);
+      // Refresh the events list
+      loadDashboardData();
     } catch (error) {
       console.error("Failed to delete event:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete event. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -282,8 +271,7 @@ export default function AdminDashboard() {
           <p className="text-gray-600 mt-2">Create and manage events on the blockchain</p>
         </div>
 
-        {/* Debug Info */}
-        <ContractDebugInfo />
+
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
