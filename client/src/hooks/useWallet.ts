@@ -10,10 +10,20 @@ export function useWallet() {
 
   const checkConnection = useCallback(async () => {
     try {
+      if (!window.ethereum) {
+        console.log("MetaMask not detected");
+        return;
+      }
+
       const connectedAddress = await web3Service.checkConnection();
       if (connectedAddress) {
         setIsConnected(true);
         setAddress(connectedAddress);
+        console.log("Wallet connected:", connectedAddress);
+      } else {
+        setIsConnected(false);
+        setAddress(null);
+        console.log("No wallet connection found");
       }
     } catch (error) {
       console.error("Error checking wallet connection:", error);
@@ -22,16 +32,19 @@ export function useWallet() {
 
   const connectWallet = useCallback(async () => {
     if (isConnecting) return;
-    
+
     setIsConnecting(true);
     try {
       const connectedAddress = await web3Service.connectWallet();
       setIsConnected(true);
       setAddress(connectedAddress);
-      
+
       toast({
         title: "Wallet Connected",
-        description: `Connected to ${connectedAddress.slice(0, 6)}...${connectedAddress.slice(-4)}`,
+        description: `Connected to ${connectedAddress.slice(
+          0,
+          6
+        )}...${connectedAddress.slice(-4)}`,
       });
     } catch (error: any) {
       toast({
@@ -62,10 +75,13 @@ export function useWallet() {
         }
       };
 
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      
+      window.ethereum.on("accountsChanged", handleAccountsChanged);
+
       return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+        window.ethereum.removeListener(
+          "accountsChanged",
+          handleAccountsChanged
+        );
       };
     }
   }, [checkConnection, disconnectWallet]);

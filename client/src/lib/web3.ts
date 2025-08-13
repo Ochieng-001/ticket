@@ -14,25 +14,33 @@ export class Web3Service {
 
   async connectWallet(): Promise<string> {
     if (!window.ethereum) {
-      throw new Error("MetaMask is not installed. Please install MetaMask to continue.");
+      throw new Error(
+        "MetaMask is not installed. Please install MetaMask to continue."
+      );
     }
 
     if (!CONTRACT_ADDRESS) {
-      throw new Error("Contract address not configured. Please set VITE_CONTRACT_ADDRESS environment variable.");
+      throw new Error(
+        "Contract address not configured. Please set VITE_CONTRACT_ADDRESS environment variable."
+      );
     }
 
     try {
       this.provider = new ethers.BrowserProvider(window.ethereum);
-      
+
       // Request account access
-      await window.ethereum.request({ method: 'eth_requestAccounts' });
-      
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+
       this.signer = await this.provider.getSigner();
       const address = await this.signer.getAddress();
-      
+
       // Initialize contract
-      this.contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, this.signer);
-      
+      this.contract = new ethers.Contract(
+        CONTRACT_ADDRESS,
+        CONTRACT_ABI,
+        this.signer
+      );
+
       return address;
     } catch (error: any) {
       if (error.code === 4001) {
@@ -43,18 +51,32 @@ export class Web3Service {
   }
 
   async checkConnection(): Promise<string | null> {
-    if (!window.ethereum || !CONTRACT_ADDRESS) return null;
+    if (!window.ethereum) {
+      console.log("MetaMask not found");
+      return null;
+    }
+
+    if (!CONTRACT_ADDRESS) {
+      console.log("Contract address not configured");
+      return null;
+    }
 
     try {
       this.provider = new ethers.BrowserProvider(window.ethereum);
       const accounts = await this.provider.listAccounts();
-      
+
       if (accounts.length > 0) {
         this.signer = await this.provider.getSigner();
-        this.contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, this.signer);
+        if (CONTRACT_ADDRESS && ethers.isAddress(CONTRACT_ADDRESS)) {
+          this.contract = new ethers.Contract(
+            CONTRACT_ADDRESS,
+            CONTRACT_ABI,
+            this.signer
+          );
+        }
         return await this.signer.getAddress();
       }
-      
+
       return null;
     } catch (error) {
       console.error("Error checking connection:", error);
@@ -63,12 +85,22 @@ export class Web3Service {
   }
 
   getContract(): ethers.Contract {
+    if (!CONTRACT_ADDRESS) {
+      throw new Error(
+        "Contract address not configured. Please set VITE_CONTRACT_ADDRESS environment variable."
+      );
+    }
+
+    if (!ethers.isAddress(CONTRACT_ADDRESS)) {
+      throw new Error(
+        "Invalid contract address format. Please check VITE_CONTRACT_ADDRESS environment variable."
+      );
+    }
+
     if (!this.contract) {
       throw new Error("Contract not initialized. Please connect wallet first.");
     }
-    if (!CONTRACT_ADDRESS) {
-      throw new Error("Contract address not configured. Please set VITE_CONTRACT_ADDRESS environment variable.");
-    }
+
     return this.contract;
   }
 
@@ -92,7 +124,7 @@ export class Web3Service {
   // Convert KES to ETH based on current exchange rate
   async kestoEth(kesAmount: number): Promise<string> {
     try {
-      const response = await fetch('/api/exchange-rate');
+      const response = await fetch("/api/exchange-rate");
       const data = await response.json();
       const ethAmount = kesAmount * data.kesToEth;
       return ethAmount.toString();
@@ -106,7 +138,7 @@ export class Web3Service {
   // Convert ETH to KES
   async ethToKes(ethAmount: string): Promise<number> {
     try {
-      const response = await fetch('/api/exchange-rate');
+      const response = await fetch("/api/exchange-rate");
       const data = await response.json();
       return parseFloat(ethAmount) * data.ethToKes;
     } catch (error) {

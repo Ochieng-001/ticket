@@ -64,27 +64,101 @@ export function useContract() {
     eventId: number, 
     ticketType: TicketType, 
     seat: string,
-    priceInEth: string
+    priceInKes: number
   ) => {
     setIsLoading(true);
     try {
-      console.log(`Purchasing ticket: eventId=${eventId}, type=${ticketType}, seat=${seat}, price=${priceInEth} ETH`);
+      console.log(`Purchasing ticket: eventId=${eventId}, type=${ticketType}, seat=${seat}, priceKES=${priceInKes}`);
       
       const contract = web3Service.getContract();
-      const priceWei = web3Service.parseEther(priceInEth);
       
-      console.log(`Price in Wei: ${priceWei.toString()}`);
+      // Get the actual price from the smart contract to ensure we send exactly what's expected
+      const eventDetails = await contract.getEventDetails(eventId);
+      const contractPriceWei = eventDetails.prices[ticketType];
       
-      // Estimate gas first
-      const gasEstimate = await contract.purchaseTicket.estimateGas(eventId, ticketType, seat, {
-        value: priceWei,
-      });
+      console.log(`Contract expects price in Wei: ${contractPriceWei.toString()}`);
+      console.log(`Contract expects price in ETH: ${web3Service.formatEther(contractPriceWei)}`);
       
-      console.log(`Gas estimate: ${gasEstimate.toString()}`);
+      const priceWei = contractPriceWei; // Use exact price from contract
+      
+      console.log(`Using exact contract price in Wei: ${priceWei.toString()}`);
+      console.log(`Using exact contract price in ETH: ${web3Service.formatEther(priceWei)}`);
+      
+      // Validate the event is still active
+      if (!eventDetails.isActive) {
+        throw new Error("Event is not active");
+      }
+      console.log("Event validation passed:", eventDetails.name);
+      
+      // Check if tickets are available for this type
+      try {
+        const availableTickets = await contract.getAvailableTickets(eventId);
+        if (Number(availableTickets[ticketType]) <= 0) {
+          throw new Error("No tickets available for this type");
+        }
+        console.log(`Available tickets for type ${ticketType}:`, Number(availableTickets[ticketType]));
+      } catch (availabilityError: any) {
+        console.error("Ticket availability check failed:", availabilityError);
+        throw new Error("Unable to check ticket availability");
+      }
+      
+      // Check user's balance before attempting purchase
+      const signer = web3Service.getSigner();
+      const userBalance = await signer.provider.getBalance(await signer.getAddress());
+      
+      console.log(`User balance: ${web3Service.formatEther(userBalance)} ETH`);
+      console.log(`Required amount: ${web3Service.formatEther(priceWei)} ETH`);
+      console.log(`Balance sufficient: ${userBalance >= priceWei}`);
+      
+      if (userBalance < priceWei) {
+        throw new Error(`Insufficient ETH balance. You have ${web3Service.formatEther(userBalance)} ETH but need ${web3Service.formatEther(priceWei)} ETH`);
+      }
+      
+      // Try to estimate gas with better error handling
+      let gasEstimate: bigint;
+      try {
+        gasEstimate = await contract.purchaseTicket.estimateGas(eventId, ticketType, seat, {
+          value: priceWei,
+        });
+        console.log(`Gas estimate: ${gasEstimate.toString()}`);
+      } catch (gasError: any) {
+        console.error("Gas estimation failed:", gasError);
+        
+        // Try to get more specific error information
+        let specificError = "Transaction would fail";
+        
+        // Try to call the function statically to get a better error message
+        try {
+          await contract.purchaseTicket.staticCall(eventId, ticketType, seat, {
+            value: priceWei,
+          });
+        } catch (staticError: any) {
+          console.error("Static call error:", staticError);
+          console.error("Static call error message:", staticError.message);
+          
+          if (staticError.message.includes("Event does not exist")) {
+            specificError = "Event does not exist";
+          } else if (staticError.message.includes("Event is not active")) {
+            specificError = "Event is not currently active";
+          } else if (staticError.message.includes("Ticket type does not exist")) {
+            specificError = "Invalid ticket type selected";
+          } else if (staticError.message.includes("No tickets available")) {
+            specificError = "No tickets available for this type";
+          } else if (staticError.message.includes("Insufficient payment")) {
+            specificError = `Insufficient payment. Required: ${web3Service.formatEther(priceWei)} ETH`;
+          } else if (staticError.message.includes("Seat already taken")) {
+            specificError = "This seat is already taken";
+          } else {
+            specificError = staticError.message || "Transaction would fail";
+          }
+        }
+        
+        throw new Error(specificError);
+      }
       
       const tx = await contract.purchaseTicket(eventId, ticketType, seat, {
         value: priceWei,
-        gasLimit: gasEstimate * BigInt(120) / BigInt(100), // Add 20% buffer to gas estimate
+        gasLimit: gasEstimate * BigInt(150) / BigInt(100), // Add 50% buffer to gas estimate
       });
       
       console.log("Transaction sent:", tx.hash);
@@ -105,13 +179,17 @@ export function useContract() {
       if (error.code === 4001) {
         errorMessage = "Transaction was rejected by user";
       } else if (error.code === -32603) {
-        errorMessage = "Transaction failed - check contract address and network";
+        errorMessage = "Transaction failed - please check your network connection";
+      } else if (error.message.includes("missing revert data")) {
+        errorMessage = "Contract call failed - please check contract address and ensure event exists";
+      } else if (error.message.includes("insufficient funds")) {
+        errorMessage = "Insufficient ETH balance for this purchase";
       } else if (error.message) {
         errorMessage = error.message;
       }
       
       toast({
-        title: "Purchase Failed",
+        title: "Purchase Failed", 
         description: errorMessage,
         variant: "destructive",
       });
@@ -390,6 +468,91 @@ export function useContract() {
     }
   }, []);
 
+  // Admin management functions
+  const addAdmin = useCallback(async (adminAddress: string) => {
+    if (!adminAddress || !ethers.isAddress(adminAddress)) {
+      throw new Error("Please enter a valid Ethereum address");
+    }
+
+    setIsLoading(true);
+    try {
+      const contract = web3Service.getContract();
+      const tx = await contract.addAdmin(adminAddress);
+      
+      console.log("Add admin transaction sent:", tx.hash);
+      await tx.wait();
+      
+      toast({
+        title: "Admin Added",
+        description: `Successfully added ${adminAddress} as an admin`,
+      });
+      
+      return tx;
+    } catch (error: any) {
+      console.error("Add admin error:", error);
+      let errorMessage = "Failed to add admin";
+      
+      if (error.code === 4001) {
+        errorMessage = "Transaction was rejected by user";
+      } else if (error.message.includes("Only owner")) {
+        errorMessage = "Only the contract owner can add admins";
+      } else if (error.message.includes("Invalid address")) {
+        errorMessage = "Invalid Ethereum address provided";
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  const removeAdmin = useCallback(async (adminAddress: string) => {
+    if (!adminAddress || !ethers.isAddress(adminAddress)) {
+      throw new Error("Please enter a valid Ethereum address");
+    }
+
+    setIsLoading(true);
+    try {
+      const contract = web3Service.getContract();
+      const tx = await contract.removeAdmin(adminAddress);
+      
+      console.log("Remove admin transaction sent:", tx.hash);
+      await tx.wait();
+      
+      toast({
+        title: "Admin Removed",
+        description: `Successfully removed ${adminAddress} from admin role`,
+      });
+      
+      return tx;
+    } catch (error: any) {
+      console.error("Remove admin error:", error);
+      let errorMessage = "Failed to remove admin";
+      
+      if (error.code === 4001) {
+        errorMessage = "Transaction was rejected by user";
+      } else if (error.message.includes("Only owner")) {
+        errorMessage = "Only the contract owner can remove admins";
+      } else if (error.message.includes("Cannot remove owner")) {
+        errorMessage = "Cannot remove the contract owner from admin role";
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      throw new Error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
   return {
     isLoading,
     createEvent,
@@ -404,5 +567,7 @@ export function useContract() {
     getTicketDetails,
     checkIfAdmin,
     getContractOwner,
+    addAdmin,
+    removeAdmin,
   };
 }
